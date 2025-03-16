@@ -8,12 +8,18 @@ pipeline {
         DOCKER_REGISTRY = "hagert"
         DOCKER_IMAGE = "app"
         DOCKERHUB_CRED_ID = "hagert"
-        //K8S_SA_TOKEN_CRED_ID = 'kube' 
-        //DEPLOYMENT = 'deployment.yaml'
-        //KUBERNETES_API_SERVER = 'https://127.0.0.1:53690'  
     }
 
     stages {
+        stage('Check Docker Access') {
+            steps {
+                script {
+                    sh 'docker ps'
+                    sh 'docker --version'
+                }
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                 git credentialsId: GITHUB_CRED_ID, url: GITHUB_REPO_URL, branch: GITHUB_REPO_BRANCH
@@ -44,36 +50,6 @@ pipeline {
                 }
             }
         }
-
-        // Uncomment this stage if you want to deploy to Kubernetes
-        // stage('Deploy to Kubernetes') {
-        //     steps {
-        //         script {
-        //             // Debugging: Check if deployment.yaml exists
-        //             sh "ls -l"
-        //             sh "cat ${DEPLOYMENT}"
-
-        //             // Update the image tag in deployment.yaml
-        //             sh """
-        //             sed -i.bak "s|${DOCKER_REGISTRY}/${DOCKER_IMAGE}:.*|${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_NUMBER}|g" ${DEPLOYMENT}
-        //             """
-
-        //             // Debugging: Check the updated deployment.yaml
-        //             sh "cat ${DEPLOYMENT}"
-
-        //             // Deploy to Kubernetes
-        //             withCredentials([string(credentialsId: "${K8S_SA_TOKEN_CRED_ID}", variable: 'KUBE_TOKEN')]) {
-        //                 sh """
-        //                 kubectl config set-credentials jenkins-user --token=${KUBE_TOKEN}
-        //                 kubectl config set-cluster kubernetes --server=${KUBERNETES_API_SERVER} --insecure-skip-tls-verify=true
-        //                 kubectl config set-context jenkins-context --cluster=kubernetes --user=jenkins-user
-        //                 kubectl config use-context jenkins-context
-        //                 kubectl apply -f ${DEPLOYMENT}
-        //                 """
-        //             }
-        //         }
-        //     }
-        // }
     }
 
     post {
