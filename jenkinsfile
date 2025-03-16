@@ -6,9 +6,9 @@ pipeline {
     }
 
     environment {
-        DOCKER_IMAGE = "myapp"
+        DOCKER_IMAGE = "hagert/maven"
         DOCKER_TAG = "${BUILD_NUMBER}"
-        DOCKERHUB_CRED_ID = ""
+        DOCKERHUB_CRED_ID = "hagert"
     }
         stages {
         stage('Check Docker Access') {
@@ -22,7 +22,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/Hager706/docker_agent.git'
+                git credentialsId: 'git', url: 'https://github.com/Hager706/docker_agent.git', branch: 'main'
             }
         }
 
