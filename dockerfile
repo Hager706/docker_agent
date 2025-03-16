@@ -1,9 +1,7 @@
-FROM nginx:latest
+FROM openjdk:8-jdk-alpine
 
-WORKDIR /usr/share/nginx/html
+WORKDIR /app
 
-COPY ./static_website/ .
+COPY target/simple-maven-app-1.0-SNAPSHOT.jar app.jar
 
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["java", "-jar", "app.jar"]
