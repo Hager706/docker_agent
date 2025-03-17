@@ -1,135 +1,107 @@
-# 🚀 Jenkins SSH Agent Setup Guide 
+# 🚀 Jenkins Pipeline with Shared Library & SSH Agent
 
-## 🏗️ Steps 
+This guide covers setting up a Jenkins pipeline using a shared library and configuring a Jenkins agent via SSH.
 
-### 1.👤 Create the `jenkins` User 
-On the target server (`192.168.105.11`), create the `jenkins` user:
+and this the link to the shared library:
+https://github.com/Hager706/shared-library.git
 
+## 📌 Pipeline Stages
+The pipeline consists of the following stages:
+
+1. **RunUnitTest** - Runs unit tests using Maven.
+2. **BuildApp** - Builds the application using Maven.
+3. **BuildImage** - Builds a Docker image from the Dockerfile.
+4. **PushImage** - Pushes the Docker image to a registry.
+5. **RemoveImageLocally** - Removes the image from the local machine.
+
+## 🏗️ Setup Jenkins SSH Agent
+
+### 1️⃣ Create the `jenkins` User on the Target Server
 ```bash
 sudo adduser jenkins
+sudo usermod -aG sudo jenkins  
 ```
 
-Add the `jenkins` user to the sudo group (optional, for administrative tasks):
-
-```bash
-sudo usermod -aG sudo jenkins
-```
-
----
-
-### 2.🔑 Generate SSH Keys for the `jenkins` User 
-Switch to the `jenkins` user:
-
+### 2️⃣ Generate SSH Keys for `jenkins`
 ```bash
 sudo -u jenkins bash
-```
-
-Generate an SSH key pair:
-
-```bash
 ssh-keygen -t rsa -b 4096 -C "jenkins@192.168.105.11"
 ```
+Save the key in the default location: `/home/jenkins/.ssh/id_rsa`.
 
-Save the key in the default location (`/home/jenkins/.ssh/id_rsa`).
-
----
-
-### 3.📌 Set Up the `.ssh` Directory 
-Ensure the `.ssh` directory has the correct permissions:
-
+### 3️⃣ Configure SSH Permissions
 ```bash
 chmod 700 /home/jenkins/.ssh
 chmod 600 /home/jenkins/.ssh/id_rsa
 chmod 644 /home/jenkins/.ssh/id_rsa.pub
 ```
 
----
-
-### 4.📝 Add the Public Key to `authorized_keys` 
-Copy the public key to the `authorized_keys` file:
-
+### 4️⃣ Add Public Key to `authorized_keys`
 ```bash
 cat /home/jenkins/.ssh/id_rsa.pub >> /home/jenkins/.ssh/authorized_keys
 chmod 600 /home/jenkins/.ssh/authorized_keys
 ```
 
----
-
-### 5.⚙️ Update SSH Server Configuration 
-Open the SSH server configuration file:
-
+### 5️⃣ Update SSH Configuration
+Edit the SSH server config:
 ```bash
 sudo nano /etc/ssh/sshd_config
 ```
+Add or update:
 ```bash
 PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
 PubkeyAcceptedAlgorithms +ssh-rsa
-```
-
-Add the `jenkins` user to `AllowUsers` :
-
-```bash
 AllowUsers hager jenkins
 ```
-
-Restart the SSH service:
-
+Restart SSH service:
 ```bash
 sudo systemctl restart sshd
 ```
 
----
-### 6.🔑 Add the Private Key to Jenkins Credentials 
+### 6️⃣ Add Private Key to Jenkins Credentials
 ```bash
 cat /home/jenkins/.ssh/id_rsa
 ```
-
-Add the private key to Jenkins credentials:
-
 1. Go to **Manage Jenkins > Credentials > System > Global credentials**.
 2. Click **Add Credentials**.
-3. Fill in the following details:
+3. Fill in the following:
    - **Kind**: SSH Username with private key
-   - **Scope**: Global
-   - **ID**: jenkins (or any preferred ID)
-   - **Username**: jenkins
+   - **ID**: `jenkins`
+   - **Username**: `jenkins`
    - **Private Key**: Paste the private key content
-4. Save the credentials.
+4. Save.
 
----
+### 7️⃣ Configure the Jenkins Agent
+1. Go to **Manage Jenkins > Nodes > New Node**.
+2. Configure as:
+   - **Name**: `ubuntu-slave`
+   - **Remote Root Directory**: `/home/jenkins/jenkins-slave`
+   - **Labels**: `ubuntu`
+3. Choose **Launch agents via SSH**.
+   - **Host**: `192.168.105.11`
+   - **Credentials**: Use ID `jenkins`
+4. Save the configuration.
 
-### 8.🔄 Configure the Jenkins Master 
-1. Go to **Manage Jenkins > Nodes > New Node >**.
-2. Configure the Slave Node
-  - Name: ubuntu-slave
-  - Remote root directory: Specify a directory on the Ubuntu VM where Jenkins can store files **(/home/jenkins/jenkins-slave)**
-  - Labels: Add labels (ubuntu)
-2. Launch method: Choose Launch agents via SSH.
-  - Host: Enter the IP address of the Ubuntu VM.
-  - Credentials: Add credentials that has **ID jenkins**
-3. Save the configuration.
+ 📸![Alt text](assets/pic3.png)
 
----
-
-### 9.📂 Create the Working Directory 
-On the target server, create the working directory for the Jenkins agent:
-
+### 8️⃣ Create the Working Directory
 ```bash
 sudo mkdir -p /home/jenkins/jenkins-slave
 sudo chown -R jenkins:jenkins /home/jenkins/jenkins-slave
 sudo chmod 755 /home/jenkins/jenkins-slave
 ```
 
----
-Step 1: Prepare the Ubuntu VM
-1. Install Java 17 on the Ubuntu VM:
+## ⚙️ Install Dependencies on Agent
+### Install Java 17
+```bash
 sudo apt update
 sudo apt install openjdk-17-jdk
 java -version
+```
 
-2. Steps to Install Docker and Kubernetes CLI on the VM (Agent)
-1. Install Docker on the VM
+### Install Docker
+```bash
 sudo apt update
 sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
@@ -138,23 +110,72 @@ sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io
 sudo systemctl enable docker
 sudo systemctl start docker
-Verify Installation:
+```
+Verify installation:
+```bash
 docker --version
-2. Install Kubernetes CLI (kubectl) on the VM
+```
 
+ 📸![Alt text](assets/pic5.png)
 
-3. Reuse Credentials from the Master
- can reuse the same Docker and Kubernetes credentials on the agent that are already configured on the Jenkins master.
- Docker:
+### Install Kubernetes CLI (kubectl)
+```bash
+sudo apt update && sudo apt install -y kubectl
+```
 
-Copy the Docker configuration file (usually located at ~/.docker/config.json) from the Jenkins master to the agent:
-on agent:
+### Configure Docker & Kubernetes Credentials
+On the agent:
+```bash
 mkdir -p ~/.kube ~/.docker
 chmod 700 ~/.kube ~/.docker
+sudo usermod -aG docker jenkins
 sudo systemctl restart ssh
- sudo usermod -aG docker jenkins
-
-on master:
+```
+On the master:
+```bash
 scp ~/.docker/config.json jenkins@192.168.105.11:~/.docker/config.json
 scp ~/.kube/config jenkins@192.168.105.11:~/.kube/config
+```
+ 📸![Alt text](assets/pic4.png)
+
+## 📦 Create a Shared Library
+**Folder structure:**
+```
+shared-library/
+│
+├── vars/
+    ├── runUnitTests.groovy
+    ├── buildApp.groovy
+    ├── buildImage.groovy
+    ├── pushImage.groovy
+    └── removeImageLocally.groovy
+```
+
+### Configure Jenkins to Use the Shared Library
+1. Go to **Manage Jenkins > Configure System**.
+2. Scroll down to **Global Pipeline Libraries**.
+3. Add a new library:
+   - **Name**: `shared-library`
+   - **Default version**: `main`
+   - **Source Code Management**: Git
+   - **Repository URL**: `<shared_library_repo_url>`
+4. Save.
+
+ 📸![Alt text](assets/pic1.png)
+
+## 🛠️ Create the Jenkins Pipeline
+Create a new pipeline job.
+
+## 🚀 Running the Pipeline
+1. Push  **pom.xml**, **Dockerfile**, and **Jenkinsfile** 
+2. Run the Jenkins pipeline job.
+
+ 📸![Alt text](assets/pic2.png)
+
+## 🎯 Explanation
+- **RunUnitTest**: Executes Maven tests.
+- **BuildApp**: Compiles the application using Maven.
+- **BuildImage**: Creates a Docker image.
+- **PushImage**: Uploads the image to a registry.
+- **RemoveImageLocally**: Cleans up the image from the system.
 
